@@ -599,6 +599,10 @@ if(BUILD_UI)
     endif()
 endif()
 
+if(NOT provisioned)
+    message(FATAL_ERROR "UI: npm failed, bailing.")
+endif()
+
 # ---------------------------------------------------------------------------
 # 3. Priority 3: HF Bucket download (if npm did not produce assets and HF_ENABLED=ON)
 # ---------------------------------------------------------------------------
