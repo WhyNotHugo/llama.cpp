@@ -436,6 +436,49 @@ function(npm_build out_var)
             message(STATUS "  stderr: ${err}")
             return()
         endif()
+
+        file(REMOVE_RECURSE "${WORK_DIR}/node_modules/sharp")
+        execute_process(
+            COMMAND ${CMAKE_COMMAND} -E create_symlink /usr/lib/node_modules/sharp "${WORK_DIR}/node_modules/sharp"
+            RESULT_VARIABLE rc
+        )
+        if(NOT rc EQUAL 0)
+            message(STATUS "UI: failed to link system sharp (${rc})")
+            return()
+        endif()
+
+        file(GLOB rollup_platform_packages "${WORK_DIR}/node_modules/@rollup/rollup-*")
+        file(REMOVE_RECURSE "${WORK_DIR}/node_modules/rollup" ${rollup_platform_packages})
+        execute_process(
+            COMMAND ${CMAKE_COMMAND} -E create_symlink /usr/share/node_modules/rollup "${WORK_DIR}/node_modules/rollup"
+            RESULT_VARIABLE rc
+        )
+        if(NOT rc EQUAL 0)
+            message(STATUS "UI: failed to link system rollup (${rc})")
+            return()
+        endif()
+
+        file(GLOB lightningcss_platform_packages "${WORK_DIR}/node_modules/lightningcss-*")
+        file(REMOVE_RECURSE "${WORK_DIR}/node_modules/lightningcss" ${lightningcss_platform_packages})
+        execute_process(
+            COMMAND ${CMAKE_COMMAND} -E create_symlink /usr/share/node_modules/lightningcss "${WORK_DIR}/node_modules/lightningcss"
+            RESULT_VARIABLE rc
+        )
+        if(NOT rc EQUAL 0)
+            message(STATUS "UI: failed to link system lightningcss (${rc})")
+            return()
+        endif()
+
+        file(GLOB oxide_platform_packages "${WORK_DIR}/node_modules/@tailwindcss/oxide-*")
+        file(REMOVE_RECURSE "${WORK_DIR}/node_modules/@tailwindcss/oxide" ${oxide_platform_packages})
+        execute_process(
+            COMMAND ${CMAKE_COMMAND} -E create_symlink /usr/share/node_modules/@tailwindcss/oxide "${WORK_DIR}/node_modules/@tailwindcss/oxide"
+            RESULT_VARIABLE rc
+        )
+        if(NOT rc EQUAL 0)
+            message(STATUS "UI: failed to link system tailwindcss-oxide (${rc})")
+            return()
+        endif()
     endif()
 
     file(MAKE_DIRECTORY "${DIST_DIR}")
