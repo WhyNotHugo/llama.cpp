@@ -4,12 +4,10 @@ import { nerdamerPlugin } from './scripts/vite-plugin-nerdamer.ts';
 import { pwaManifestPlugin } from './scripts/vite-plugin-pwa-manifest.ts';
 import { relativizeBasePlugin } from './scripts/vite-plugin-relativize-base.ts';
 import { splashScreenPlugin } from './scripts/vite-plugin-splash-screen.ts';
-import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
 import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 import tailwindcss from '@tailwindcss/vite';
-import { playwright } from '@vitest/browser-playwright';
 import { mdsvex } from 'mdsvex';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
@@ -25,25 +23,41 @@ const LLAMA_HARNESS_CHAT_ONLY_ENTRY = resolve(
 	__dirname,
 	'src/lib/stores/agentic/harness-chat-only.ts'
 );
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const browserBaseConfig: any = {
-	enabled: true,
-	instances: [{ browser: 'chromium' }],
-	// CI runs the bundled Chromium without its sandbox, which the runners can't start;
-	// locally, the installed (auto-updated) Chrome with its sandbox on, see playwright.config.ts
-	provider: playwright({
-		launchOptions: process.env.CI
-			? { args: ['--no-sandbox'] }
-			: { channel: 'chrome', chromiumSandbox: true }
-	})
-};
 // CMake sets LLAMA_UI_OUT_DIR to the staging dir under the build tree; manual
 // `npm run build` runs without the env var default to ./dist.
 const outDir = process.env.LLAMA_UI_OUT_DIR ?? './dist';
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(async ({ mode }) => {
 	const env = loadEnv(mode, process.cwd(), 'VITE_PUBLIC_');
 	const SERVER_ORIGIN = env.VITE_PUBLIC_SERVER_ORIGIN || 'http://localhost:9931';
+
+	// Load test-only plugins lazily: they pull in oxc-resolver, which is only
+	// published for a few architectures.
+	const isVitest = !!process.env.VITEST;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const storybookTestPlugins: any[] = [];
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const browserBaseConfig: any = {
+		enabled: true,
+		instances: [{ browser: 'chromium' }]
+	};
+
+	if (isVitest) {
+		const { storybookTest } = await import('@storybook/addon-vitest/vitest-plugin');
+		const { playwright } = await import('@vitest/browser-playwright');
+		storybookTestPlugins.push(
+			storybookTest({
+				storybookScript: 'pnpm run storybook --no-open'
+			})
+		);
+		browserBaseConfig.provider = playwright({
+			// CI runs the bundled Chromium without its sandbox, which the runners can't start;
+			// locally, the installed (auto-updated) Chrome with its sandbox on, see playwright.config.ts
+			launchOptions: process.env.CI
+				? { args: ['--no-sandbox'] }
+				: { channel: 'chrome', chromiumSandbox: true }
+		});
+	}
 
 	return {
 		build: {
@@ -152,11 +166,7 @@ export default defineConfig(({ mode }) => {
 
 				{
 					extends: './vite.config.ts',
-					plugins: [
-						storybookTest({
-							storybookScript: 'pnpm run storybook --no-open'
-						})
-					],
+					plugins: storybookTestPlugins,
 					test: {
 						browser: { ...browserBaseConfig, instances: [{ browser: 'chromium', headless: true }] },
 						// Llama UI's stories, shown in this Storybook too, are tested by the library itself (ui/lib/ui)
